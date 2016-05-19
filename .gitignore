@@ -1,6 +1,7 @@
 # Specified files
 config.ini
 .idea/
+output/
 
 
 # Byte-compiled / optimized / DLL files

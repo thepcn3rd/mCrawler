@@ -45,6 +45,9 @@ def crawl(url, domain):
             listEmails.append(listCurrentEmails[j])
     print
     print "Current URL: " + url
+    print
+    raw_input("Press any key to continue...")
+    print
 
 
 class webCrawler(cmd.Cmd):
@@ -101,6 +104,8 @@ class webCrawler(cmd.Cmd):
                 print str(i) + ": " + listURLs[i]
                 currentIDs.append(str(i))
             print
+            print "Current URL: " + self.url
+            print
             print "D. Display HTML Content of Current URL"
             print "E. Edit a URL from the List"
             print "R. Remove a URL from the List"
@@ -111,6 +116,8 @@ class webCrawler(cmd.Cmd):
                 crawl(self.url, self.domain)
             elif selection == "d" or selection == "D":
                 print htmlContent
+                print
+                raw_input("Press any key to continue...")
             elif selection == "e" or selection == "E":
                 editSelection = raw_input("URL to Edit (Select by preceeding number): ")
                 if editSelection in currentIDs:
@@ -120,7 +127,9 @@ class webCrawler(cmd.Cmd):
                 else:
                     print "Invalid URL Selection to Edit"
             elif selection == "r" or selection == "R":
-                print htmlContent
+                delSelection = raw_input("URL to Delete (Select from preceeding number): ")
+                if delSelection in currentIDs:
+                    listURLs.remove(listURLs[int(delSelection)])
             elif selection == 'q' or selection == 'Q':
                 break
             else:
@@ -130,6 +139,33 @@ class webCrawler(cmd.Cmd):
     def do_displayURL(self, input):
         'Display the current URL'
         print "Current URL: " + self.url
+        return
+
+    def do_flushEmailCache(self, input):
+        'Flushes the Cache of Emails Collected from Pages'
+        global listEmails
+        listEmails = []
+        return
+
+    def do_flushURLCache(self, input):
+        'Flushes the Cache of URLs Collected from Pages'
+        global listURLs
+        listURLs = []
+        return
+
+    def do_saveEmailCache(self, filename):
+        'Saves the Emails that are in a Cache to a File (will overwrite the file)'
+        global listEmails
+        if len(filename) > 0:
+            f = open(filename, "w")
+            for i in range(0, len(listEmails)):
+                f.write(listEmails[i] + "\n")
+            f.close()
+            print "Saved the output to the following file: " + filename
+        else:
+            print "Invalid filename format."
+            print "Usage: saveEmailCache <filename>"
+            print
         return
 
 
