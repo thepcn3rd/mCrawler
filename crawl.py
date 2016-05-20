@@ -6,8 +6,16 @@ import re
 
 # Global Variables
 
-emailRE = re.compile("[A-Za-z0-9-_\.]+@[A-Za-z0-9]+\.[a-zA-Z]{2,5}")
-urlRE = re.compile("(?:http\:\/\/|https\:\/\/|)[A-Za-z0-9-_\.]+\.[a-zA-Z]{2,5}")
+#emailRE = re.compile("[A-Za-z0-9-_\.]+@[A-Za-z0-9]+\.[a-zA-Z]{2,5}")
+emailRE = re.compile("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+#urlRE = re.compile("(?:http\:\/\/|https\:\/\/|)[A-Za-z0-9-_\.]+\.[a-zA-Z]{2,5}")
+#urlRE = re.compile("(?:http\:\/\/|https\:\/\/|)(?:[a-zA-Z0-9-_\/]+|)[A-Za-z0-9-_\.]+\.[a-zA-Z]{2,5}")
+#urlRE = re.compile(".*((href=|src=)(\x22|')(?P<url>[a-zA-Z0-9-_\.\/]+)(\x22|'))|((?P<urlFull>(http:\/\/|https:\/\/)[a-zA-Z0-9-_\.]{5,})).*")
+#urlRE = re.compile("((href=|src=)(\x22|')(?P<url>[a-zA-Z0-9-_\.\/]+)(\x22|'))|((?P<urlFull>(http:\/\/|https:\/\/)[a-zA-Z0-9-_\.]{5,}))")
+urlRE = re.compile("((href=|src=)(\x22|'|)(?P<url>(http:\/\/|https:\/\/|)[a-zA-Z0-9-_\.\/]+)(\x22|'|))|((?P<urlFull>(http:\/\/|https:\/\/)[a-zA-Z0-9-_\.]{5,}))")
+# (?<url>(http:\/\/|https:\/\/)[a-zA-Z0-9-_\.]{5,}) (Standard URL Syntax)
+# (href=|src=)("|')(?<url>[a-zA-Z0-9-_\.\/]+)("|') (Pulling pages out from between tags)
+domainRE = re.compile("[a-zA-Z0-9-_\.]")
 listEmails = []
 listURLs = []
 htmlContent = ""
@@ -22,8 +30,12 @@ def crawl(url, domain):
     for line in page.content.split('\n'):
         if urlRE.search(line) is not None:
             webPage = urlRE.search(line)
-            if not webPage.group(0) in listCurrentPages and not webPage.group(0) in url:
-                listCurrentPages.append(webPage.group(0))
+            if webPage.group('url') is not None:
+                if not webPage.group('url') in listCurrentPages and not webPage.group('url') in url:
+                    listCurrentPages.append(webPage.group('url'))
+            if webPage.group('urlFull') is not None:
+                if not webPage.group('urlFull') in listCurrentPages and not webPage.group('urlFull') in url:
+                    listCurrentPages.append(webPage.group('urlFull'))
         if emailRE.search(line) is not None:
             email = emailRE.search(line)
             if not email.group(0) in listCurrentEmails:
@@ -33,7 +45,14 @@ def crawl(url, domain):
     for i in range(0, len(listCurrentPages)):
         print listCurrentPages[i]
         if not "http" in listCurrentPages[i]:
+            # If the URL begins with a slash remove it to avoid double slashes in a URL
+            if listCurrentPages[i][:1] == "/":
+                listCurrentPages[i] = listCurrentPages[i][1:]
             newURL = "http://" + domain + "/" + listCurrentPages[i]
+            if not newURL in listURLs:
+                listURLs.append(newURL)
+        else:
+            newURL = listCurrentPages[i]
             if not newURL in listURLs:
                 listURLs.append(newURL)
     print
@@ -57,10 +76,14 @@ class webCrawler(cmd.Cmd):
         print "As it crawls it will extract urls and email addresses based on regular expressions."
         print "You can modify the regular expressions that are searched for as you crawl."
         print
-        # print "Which Domain are we crawling (ie. scriptkitty.work)"
-        # self.domain = raw_input("? ")
-        self.domain = "scriptkitty.work"
-        self.url = "http://" + self.domain
+        print "Which Domain are we crawling (ie. scriptkitty.work)"
+        self.domain = raw_input("? ")
+        #self.domain = "scriptkitty.work"
+        secureURL = raw_input("Is the domain a secure site? ")
+        if secureURL == 'y' or secureURL == 'Y':
+            self.url = "https://" + self.domain
+        else:
+            self.url = "http://" + self.domain
         print
         crawl(self.url, self.domain)
         print
@@ -81,11 +104,21 @@ class webCrawler(cmd.Cmd):
         crawl(self.url, self.domain)
         return
 
-    def do_changeURL(self, newURL):
+    def do_crawl(self, input):
+        'Recrawls the current URL'
+        crawl(self.url, self.domain)
+        return
+
+    def do_changeDomain(self, newDomain):
         'Change the current URL manually'
-        global urlRE
-        if urlRE.match(newURL):
-            self.url = newURL.lower()
+        global domainRE
+        if domainRE.match(newDomain):
+            self.domain = newDomain.lower()
+            secureURL = raw_input("Is the domain a secure site? ")
+            if secureURL == 'y' or secureURL == 'Y':
+                self.url = "https://" + self.domain
+            else:
+                self.url = "http://" + self.domain
         else:
             print "Incorrect format based on the regular expression provided."
             print "Syntax: changeURL http://scriptkitty.work"
@@ -106,6 +139,7 @@ class webCrawler(cmd.Cmd):
             print
             print "Current URL: " + self.url
             print
+            print "C. Crawl Current URL"
             print "D. Display HTML Content of Current URL"
             print "E. Edit a URL from the List"
             print "R. Remove a URL from the List"
@@ -113,6 +147,8 @@ class webCrawler(cmd.Cmd):
             selection = raw_input("Select the URL by the preceeding number: ")
             if selection in currentIDs:
                 self.url = listURLs[int(selection)]
+                crawl(self.url, self.domain)
+            elif selection == "c" or selection == "C":
                 crawl(self.url, self.domain)
             elif selection == "d" or selection == "D":
                 print htmlContent
@@ -154,19 +190,57 @@ class webCrawler(cmd.Cmd):
         return
 
     def do_saveEmailCache(self, filename):
-        'Saves the Emails that are in a Cache to a File (will overwrite the file)'
+        'Saves the Emails that are in the Cache to a File (will overwrite the file)'
         global listEmails
         if len(filename) > 0:
-            f = open(filename, "w")
+            fPath = "output/" + filename
+            f = open(fPath, "w")
             for i in range(0, len(listEmails)):
                 f.write(listEmails[i] + "\n")
             f.close()
-            print "Saved the output to the following file: " + filename
+            print "Saved the output to the following file: " + fPath
         else:
             print "Invalid filename format."
             print "Usage: saveEmailCache <filename>"
             print
         return
+
+    def do_saveURLCache(selfself, filename):
+        'Saves the URLs that are in the Cache to a File (will overwrite the file)'
+        global listURLs
+        if len(filename) > 0:
+                fPath = "output/" + filename
+                f = open(fPath, "w")
+                for i in range(0, len(listURLs)):
+                    f.write(listURLs[i] + "\n")
+                f.close()
+                print "Saved the output to the following file: " + fPath
+        else:
+                print "Invalid filename format."
+                print "Usage: saveURLCache <filename>"
+                print
+        return
+
+    def do_showEmailCache(self, input):
+        'Shows the contents of the email cache.'
+        global listEmails
+        print "Email Cache"
+        print "-----------"
+        for i in range(0, len(listEmails)):
+            print listEmails[i]
+        print
+        return
+
+    def do_showURLCache(self, input):
+        'Shows the contents of the URL cache.'
+        global listURLs
+        print "URL Cache"
+        print "---------"
+        for i in range(0, len(listURLs)):
+            print listURLs[i]
+        print
+        return
+
 
 
 def main():
